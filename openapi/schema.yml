@@ -76,6 +76,47 @@ paths:
                 $ref: '#/components/schemas/Member'
         '401':
           description: Unauthorized
+  /api/messages/:
+    get:
+      operationId: api_messages_list
+      description: Get list of group chat messages.
+      tags:
+      - api
+      security:
+      - TokenAuth: []
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatMessage'
+        '401':
+          description: Unauthorized
+    post:
+      operationId: api_messages_create
+      description: Create a new group chat message.
+      tags:
+      - api
+      security:
+      - TokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessageCreate'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+        '401':
+          description: Unauthorized
 components:
   schemas:
     Message:
@@ -122,6 +163,30 @@ components:
       required:
       - username
       - token
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        text:
+          type: string
+        created_at:
+          type: number
+          format: double
+      required:
+      - id
+      - username
+      - text
+      - created_at
+    ChatMessageCreate:
+      type: object
+      properties:
+        text:
+          type: string
+      required:
+      - text
   securitySchemes:
     basicAuth:
       type: http

@@ -2,7 +2,7 @@ import base64
 import hashlib
 import hmac
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -16,6 +16,33 @@ from .serializers import MessageSerializer
 
 # In-memory member store
 MEMBERS: Dict[str, Dict[str, Any]] = {}
+
+
+# In-memory messages store for group chat
+MESSAGES: List[Dict[str, Any]] = []
+LAST_MESSAGE_ID: int = 0
+MAX_STORED_MESSAGES: int = 1000
+
+
+def create_message(username: str, text: str) -> Dict[str, Any]:
+    """Create and store a new chat message in memory."""
+    global LAST_MESSAGE_ID
+    LAST_MESSAGE_ID += 1
+
+    message: Dict[str, Any] = {
+        "id": LAST_MESSAGE_ID,
+        "username": username,
+        "text": text,
+        "created_at": time.time(),
+    }
+
+    MESSAGES.append(message)
+
+    # simple cap to avoid unbounded growth
+    if len(MESSAGES) > MAX_STORED_MESSAGES:
+        del MESSAGES[0 : len(MESSAGES) - MAX_STORED_MESSAGES]
+
+    return message
 
 
 # Password hashing
@@ -202,3 +229,35 @@ class ProfileView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class MessageListCreateView(APIView):
+    """List all group chat messages or create a new one (in-memory)."""
+
+    def get(self, request):
+        # Ensure the user is authenticated; we ignore the returned member here.
+        get_authenticated_member(request)
+
+        # Return up to the last 100 messages
+        messages = MESSAGES[-100:]
+        return Response(messages, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        member = get_authenticated_member(request)
+        text = str(request.data.get("text", "")).strip()
+
+        if not text:
+            return Response(
+                {"detail": "Текст сообщения не может быть пустым"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(text) > 1000:
+            return Response(
+                {"detail": "Текст сообщения слишком длинный"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        username = member.get("username", "")
+        message = create_message(username, text)
+        return Response(message, status=status.HTTP_201_CREATED)
